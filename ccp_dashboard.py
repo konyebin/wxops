@@ -55,12 +55,18 @@ if auto_refresh:
     st.rerun()
 
 # ── Load data ─────────────────────────────────────────────────────────────────
+def clean_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Strip whitespace from column names and string values."""
+    df.columns = df.columns.str.strip()
+    return df
+
+
 @st.cache_data(ttl=30)
 def load_data(file_paths: tuple, uploaded_names: tuple) -> pd.DataFrame:
     dfs = []
     for path in file_paths:
         try:
-            dfs.append(pd.read_csv(path, low_memory=False))
+            dfs.append(clean_df(pd.read_csv(path, low_memory=False)))
         except Exception as e:
             st.warning(f"Could not read {Path(path).name}: {e}")
     return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
@@ -71,7 +77,7 @@ def load_uploaded(files) -> pd.DataFrame:
     dfs = []
     for f in files:
         try:
-            dfs.append(pd.read_csv(f, low_memory=False))
+            dfs.append(clean_df(pd.read_csv(f, low_memory=False)))
         except Exception as e:
             st.warning(f"Could not read {f.name}: {e}")
     return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
@@ -89,6 +95,10 @@ if raw_df.empty:
     st.stop()
 
 # ── Filter: Cisco Calling Plan only ──────────────────────────────────────────
+if "PSTN vendor name" not in raw_df.columns:
+    st.error(f"Column 'PSTN vendor name' not found. Columns detected: {list(raw_df.columns)}")
+    st.stop()
+
 ccp_df = raw_df[
     raw_df["PSTN vendor name"].astype(str).str.contains("Cisco Calling Plans", case=False, na=False)
 ].copy()
@@ -113,6 +123,11 @@ selected_directions = st.sidebar.multiselect(
     "Call Direction", direction_options, default=direction_options
 )
 
+user_type_options = sorted(ccp_df["User type"].dropna().unique().tolist())
+selected_user_types = st.sidebar.multiselect(
+    "User Type", user_type_options, default=user_type_options
+)
+
 date_min = ccp_df["Date"].min()
 date_max = ccp_df["Date"].max()
 date_range = st.sidebar.date_input("Date Range", value=(date_min, date_max))
@@ -120,7 +135,10 @@ date_range = st.sidebar.date_input("Date Range", value=(date_min, date_max))
 top_n = st.sidebar.slider("Show top N users", min_value=5, max_value=50, value=20)
 
 # Apply filters
-filtered = ccp_df[ccp_df["Direction"].isin(selected_directions)]
+filtered = ccp_df[
+    ccp_df["Direction"].isin(selected_directions) &
+    ccp_df["User type"].isin(selected_user_types)
+]
 if len(date_range) == 2:
     filtered = filtered[
         (filtered["Date"] >= date_range[0]) & (filtered["Date"] <= date_range[1])
@@ -142,7 +160,7 @@ st.divider()
 
 # ── Per-user summary ──────────────────────────────────────────────────────────
 user_summary = (
-    filtered.groupby("User")
+    filtered.groupby(["User", "User type"])
     .agg(
         Total_Calls=("Duration_min", "count"),
         Total_Minutes=("Duration_min", "sum"),
@@ -232,6 +250,7 @@ st.divider()
 st.subheader("📋 User Summary Table")
 display_df = user_summary.rename(columns={
     "User": "User",
+    "User type": "User Type",
     "Total_Calls": "Total Calls",
     "Total_Minutes": "Total Minutes",
     "Avg_Duration_min": "Avg Duration (min)",
