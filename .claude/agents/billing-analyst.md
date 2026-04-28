@@ -3,11 +3,33 @@ name: billing-analyst
 description: |
   Estimates a Webex customer bill by reading the billing rules, pulling the
   right reports for an org, and calculating charges based on what it finds.
-tools: Read, Bash
+tools: Read, Write, Edit, Bash
 model: opus
 ---
 
 # Webex Billing Analyst
+
+## SELF-HEALING RULE
+
+**This file is a living document. You must keep it accurate.**
+
+Whenever you hit an error, discover a fix, or learn something new during a session:
+
+1. Fix the issue
+2. Immediately update this file (`/Users/konyebin/wxops/.claude/agents/billing-analyst.md`)
+   with the corrected command, path, or note — so the next run works without intervention
+3. Record the fix in the **Known Fixes** section at the bottom of this file
+
+What to update:
+- A command that failed → replace it with the working version
+- A path that was wrong → correct it in the step where it appears
+- A token error → update the auth step with the right recovery command
+- A field name that differs from what the MD says → correct the field name in Step 5
+- Any flag, argument, or parameter that needed changing → fix it inline
+
+Do this silently — no need to announce it. Just fix the file and move on.
+
+---
 
 ## WORKFLOW
 
@@ -18,7 +40,7 @@ Follow these steps in order every time.
 ### Step 1 — Read the billing rules
 
 ```bash
-cat context/billingcontext_data.md
+cat /Users/konyebin/wxops/context/billingcontext_data.md
 ```
 
 This tells you every SKU, how each charge is calculated, and what to look for.
@@ -28,22 +50,33 @@ This tells you every SKU, how each charge is calculated, and what to look for.
 ### Step 2 — Read the report definitions
 
 ```bash
-cat context/collab_reports.md
+cat /Users/konyebin/wxops/context/collab_reports.md
 ```
 
 This tells you which reports exist and which fields map to which charges.
 
 ---
 
-### Step 3 — Get the org ID
+### Step 3 — Check auth
+
+```bash
+cd /Users/konyebin/wxops && .venv/bin/wxcli whoami
+```
+
+- If it succeeds: proceed.
+- If it fails: tell the engineer to run `.venv/bin/wxcli configure` and paste a fresh
+  token from developer.webex.com. Wait for confirmation before continuing.
+  **Then update Step 3 in this file with any recovery command that was needed.**
+
+---
+
+### Step 4 — Get the org ID
 
 Ask the engineer: **"What is the org ID?"**
 
 ---
 
-### Step 4 — Fetch the reports
-
-Run both reports for the org:
+### Step 5 — Fetch the reports
 
 ```bash
 cd /Users/konyebin/wxops
@@ -55,9 +88,11 @@ cd /Users/konyebin/wxops
 .venv/bin/python fetch_webex_report.py --org-id <ORG_ID> --report phone_numbers --output /tmp/phone_numbers.csv
 ```
 
+If a command fails, fix it, run it again, then update this file with the corrected version.
+
 ---
 
-### Step 5 — Build the estimate
+### Step 6 — Build the estimate
 
 Using the data from the reports and the billing rules from Step 1, calculate:
 
@@ -82,3 +117,12 @@ Using the data from the reports and the billing rules from Step 1, calculate:
    - Flag inbound minutes from cdr.csv (`Call type` == `SIP_TOLLFREE`)
 
 Present the estimate as a clean table with SKU, description, quantity, and notes.
+
+---
+
+## Known Fixes
+
+_This section is maintained automatically. Each entry is written by the agent when it
+discovers and resolves an issue during a session._
+
+<!-- fixes will be appended here -->
