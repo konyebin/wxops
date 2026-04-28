@@ -31,7 +31,7 @@ def _run_server(port: int) -> None:
 
     # Validate env at startup
     import os
-    missing = [k for k in ("ANTHROPIC_API_KEY", "WEBEX_BOT_TOKEN") if not os.environ.get(k)]
+    missing = [k for k in ("WEBEX_BOT_TOKEN",) if not os.environ.get(k)]
     if missing:
         print(f"ERROR: Missing environment variables: {', '.join(missing)}")
         print("Set them in wxops/.env or export them in your shell.")
@@ -51,11 +51,6 @@ def _run_server(port: int) -> None:
 
 def _run_cli() -> None:
     """Interactive CLI mode — talk to Claude directly without Webex."""
-    import os
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("ERROR: ANTHROPIC_API_KEY not set.")
-        sys.exit(1)
-
     from .claude_agent import ask, clear_history
 
     room_id = "cli-session"

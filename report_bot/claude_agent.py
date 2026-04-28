@@ -6,7 +6,6 @@ When Claude calls a tool the loop executes it and feeds the result back
 until Claude issues end_turn.
 """
 
-import os
 from collections import defaultdict
 
 import anthropic
@@ -22,10 +21,7 @@ _client: anthropic.Anthropic | None = None
 def _get_client() -> anthropic.Anthropic:
     global _client
     if _client is None:
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise EnvironmentError("ANTHROPIC_API_KEY environment variable not set.")
-        _client = anthropic.Anthropic(api_key=api_key)
+        _client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env when set
     return _client
 
 
