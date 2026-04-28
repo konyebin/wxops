@@ -21,6 +21,8 @@ below for what the pipeline does.
 
 **To debug a failing configuration:** Use `/wxc-calling-debug` (this one is a skill, invoked directly).
 
+**To explain a customer bill or analyse usage reports:** `/agents` → billing-analyst → describe what you need (paste an invoice line, provide an org ID, or drop a CSV path).
+
 ### Agent Invocation Pattern
 
 wxc-calling-builder is a **phase-per-invocation** agent. Each major phase runs as a
@@ -47,6 +49,7 @@ fresh agent invocation — do not resume agents via `SendMessage` for multi-phas
 |------|---------|
 | `.claude/agents/wxc-calling-builder.md` | Main builder agent — drives the full workflow |
 | `.claude/agents/migration-advisor.md` | Opus-powered CCIE-level migration advisor — architectural reasoning + decision review |
+| `.claude/agents/billing-analyst.md` | Billing analyst — explain invoices, fetch usage reports, analyse CDR/call-queue CSVs |
 | `.claude/skills/provision-calling/` | Skill: provision users, locations, licenses |
 | `.claude/skills/teardown/` | Skill: dependency-safe teardown, `wxcli cleanup`, manual deletion procedure |
 | `.claude/skills/configure-features/` | Skill: set up call features (AA, CQ, HG, etc.; CX Essentials → see customer-assist skill) |
