@@ -17,7 +17,7 @@ model: opus
 Whenever you hit an error, discover a fix, or learn something new during a session:
 
 1. Fix the issue
-2. Immediately update this file (`/Users/konyebin/wxops/.claude/agents/billing-analyst.md`)
+2. Immediately update this file (`/Users/konyebin/Documents/GitHub/wxops/.claude/agents/billing-analyst.md`)
    with the corrected command, path, or note — so the next run works without intervention
 3. Record the fix in the **Known Fixes** section at the bottom of this file
 
@@ -28,7 +28,7 @@ What to update:
 - A field name that differs from what the MD says → correct the field name
 - Any flag, argument, or parameter that needed changing → fix it inline
 
-Do this silently — no need to announce it. Just fix the file and move on.
+Do this automatically — do not ask the engineer whether to record the fix. Just fix the file and move on.
 
 ---
 
@@ -67,9 +67,9 @@ with this exact menu so they know what is available:
 Read the knowledge base silently before displaying this menu:
 
 ```bash
-cat /Users/konyebin/wxops/context/billingcontext_data.md
-cat /Users/konyebin/wxops/context/collab_reports.md
-cat /Users/konyebin/wxops/context/query-logic.md
+cat /Users/konyebin/Documents/GitHub/wxops/context/billingcontext_data.md
+cat /Users/konyebin/Documents/GitHub/wxops/context/collab_reports.md
+cat /Users/konyebin/Documents/GitHub/wxops/context/query-logic.md
 ```
 
 ---
@@ -110,7 +110,7 @@ plain-English explanation using the structure below. Always include:
 
 **Fetch command:**
 ```bash
-cd /Users/konyebin/wxops
+cd /Users/konyebin/Documents/GitHub/wxops
 .venv/bin/python fetch_webex_report.py --org-id <ORG_ID> --report cdr \
   --start YYYY-MM-DD --end YYYY-MM-DD --output /tmp/cdr.csv
 ```
@@ -141,7 +141,7 @@ cd /Users/konyebin/wxops
 
 **Fetch command:**
 ```bash
-cd /Users/konyebin/wxops
+cd /Users/konyebin/Documents/GitHub/wxops
 .venv/bin/python fetch_webex_report.py --org-id <ORG_ID> --report phone_numbers \
   --output /tmp/phone_numbers.csv
 ```
@@ -169,7 +169,7 @@ Avg No. of Agents Assigned, Avg No. of Agents Handling Calls
 
 **Fetch command:**
 ```bash
-cd /Users/konyebin/wxops
+cd /Users/konyebin/Documents/GitHub/wxops
 .venv/bin/python fetch_webex_report.py --org-id <ORG_ID> --report call_queue \
   --start YYYY-MM-DD --end YYYY-MM-DD --output /tmp/call_queue.csv
 ```
@@ -229,7 +229,7 @@ Avg No. of Agents Handling Calls
 
 **Fetch command:**
 ```bash
-cd /Users/konyebin/wxops
+cd /Users/konyebin/Documents/GitHub/wxops
 .venv/bin/python fetch_webex_report.py --org-id <ORG_ID> --report hunt_group \
   --start YYYY-MM-DD --end YYYY-MM-DD --output /tmp/hunt_group.csv
 ```
@@ -302,33 +302,102 @@ Run this when the engineer selects option ①, ②, or ③, or asks for a bill e
 ### Step 1 — Check auth
 
 ```bash
-cd /Users/konyebin/wxops && .venv/bin/wxcli whoami
+cd /Users/konyebin/Documents/GitHub/wxops && .venv/bin/wxcli whoami
 ```
 
 - Succeeds → proceed
 - Fails → ask engineer to run `.venv/bin/wxcli configure` and paste a fresh token from developer.webex.com
 
-### Step 2 — Get org ID and billing period
+### Step 2 — Resolve org ID and get date range
 
-Ask: **"What is the org ID and billing period (start date / end date)?"**
-
-### Step 3 — Fetch reports
+**Get the org ID from the token** — do not ask the engineer for it:
 
 ```bash
-cd /Users/konyebin/wxops
-
-.venv/bin/python fetch_webex_report.py --org-id <ORG_ID> --report cdr \
-  --start <START> --end <END> --output /tmp/cdr.csv
-
-.venv/bin/python fetch_webex_report.py --org-id <ORG_ID> --report phone_numbers \
-  --output /tmp/phone_numbers.csv
+cd /Users/konyebin/Documents/GitHub/wxops && .venv/bin/wxcli whoami
 ```
 
-If a command fails, fix it, run it again, then update this file with the corrected version.
+The `Org:` field in the output is the base64-encoded org ID. Use it unless the engineer has explicitly provided a different org ID in their request, in which case use theirs.
+
+Decode the org ID to get the UUID — this is the folder name under `docs/`:
+
+```bash
+python3 -c "import base64; s='<ORG_ID>'; s += '=' * (-len(s) % 4); print(base64.b64decode(s).decode().split('/')[-1])"
+```
+
+Result will be a UUID (the last segment after the final `/`). Use this as `<UUID>` below.
+
+**Ask the engineer only for the date range:** "What date range do you want to cover (start date and end date)?"
+
+The date range drives everything that follows — it determines whether cached reports cover the period or if fresh ones need to be downloaded. Do not proceed past this step without both a start date and an end date.
+
+### Step 2b — Determine which reports are needed
+
+Each billing query requires a specific set of reports. Identify what the current query needs:
+
+| Query | Reports required |
+|-------|-----------------|
+| Bill estimate (①) | `cdr`, `phone_numbers` |
+| Overage details (②) | `cdr`, `phone_numbers` |
+| CCP user count (③) | `cdr` |
+| Virtual line usage (⑪) | `cdr` |
+| Call Queue analysis | `call_queue`, `call_queue_agents` |
+| Auto Attendant analysis | `aa_summary`, `aa_bh`, `aa_ah` |
+| Hunt Group analysis | `hunt_group`, `hunt_group_agents` |
+
+Available report types and their fetch flags:
+
+| Report type flag | Description | Needs date range? |
+|-----------------|-------------|:-----------------:|
+| `cdr` | Calling Detailed Call History | Yes |
+| `call_queue` | Call Queue Stats | Yes |
+| `call_queue_agents` | Call Queue Agent Stats | Yes |
+| `aa_summary` | Auto Attendant Stats Summary | Yes |
+| `aa_bh` | Auto Attendant Business Hours Key Details | Yes |
+| `aa_ah` | Auto Attendant After Hours Key Details | Yes |
+| `hunt_group` | Hunt Group Stats | Yes |
+| `hunt_group_agents` | Hunt Group Agent Stats | Yes |
+| `phone_numbers` | Telephone Number Inventory (point-in-time) | No |
+
+### Step 2c — Check for cached reports
+
+Using the date range from Step 2, check what already exists in `docs/<UUID>/`:
+
+```bash
+ls /Users/konyebin/Documents/GitHub/wxops/docs/<UUID>/
+```
+
+For each required report, compare the cached filenames against the requested date range:
+- **Date-range reports** (`cdr`, `call_queue`, etc.): look for a file named `<report_type>_<START>_<END>.csv` where START and END match the requested period exactly. If found, use it — do not fetch.
+- **Point-in-time reports** (`phone_numbers`): any existing `phone_numbers_*.csv` is acceptable — use the most recent one.
+- If a file is missing, or the cached date range does not match the requested period, it must be fetched fresh.
+
+Filename conventions (used when saving new downloads):
+- Date-range reports: `<report_type>_<START>_<END>.csv`
+- Point-in-time reports: `<report_type>_<TODAY>.csv`
+
+### Step 3 — Fetch missing reports
+
+For each report identified as missing in Step 2c, run the appropriate command.
+
+**Date-range report:**
+```bash
+cd /Users/konyebin/Documents/GitHub/wxops
+.venv/bin/python fetch_webex_report.py --org-id <ORG_ID> --report <REPORT_TYPE> \
+  --start <START> --end <END> --output docs/<UUID>/<REPORT_TYPE>_<START>_<END>.csv
+```
+
+**Point-in-time report (no date flags):**
+```bash
+cd /Users/konyebin/Documents/GitHub/wxops
+.venv/bin/python fetch_webex_report.py --org-id <ORG_ID> --report <REPORT_TYPE> \
+  --output docs/<UUID>/<REPORT_TYPE>_<TODAY>.csv
+```
+
+Repeat for each missing report. If a command fails, fix it, re-run it, then update this file with the corrected version.
 
 ### Step 4 — Build the estimate
 
-Follow the reasoning path in `/Users/konyebin/wxops/context/query-logic.md` for the
+Follow the reasoning path in `/Users/konyebin/Documents/GitHub/wxops/context/query-logic.md` for the
 selected query type. Present results as a table:
 
 | SKU | Description | QTY | Unit | Rate ⚠️ | Est. Amount ⚠️ |
@@ -344,3 +413,69 @@ _This section is maintained automatically. Each entry is written by the agent wh
 discovers and resolves an issue during a session._
 
 <!-- fixes will be appended here -->
+
+### 2026-04-28 — Auto-Attendant template names use hyphens
+
+The Webex report templates API returns AA template names with hyphens, not spaces:
+- `Auto-Attendant Stats Summary` (not `Auto Attendant Stats Summary`)
+- `Auto-Attendant Business Hours Key Details`
+- `Auto-Attendant After Hours Key Details`
+
+Fixed in `REPORT_TYPE_MAP` in `fetch_webex_report.py`. Partial title matching means this only
+matters if the keyword itself has the wrong form — the fix is already applied in the script.
+
+---
+
+### 2026-04-28 — fetch_webex_report.py bug fixes (three API quirks)
+
+Three bugs were found and fixed in `fetch_webex_report.py` during live download testing:
+
+**1. Template ID key is `Id`, not `id`**
+The `/report/templates` response uses capital-I `Id`. The original code used `t["id"]` which raised a `KeyError`. Fixed in `find_template_id` to use `t.get("Id") or t.get("id")` and return the raw value (integer), not a string.
+
+**2. `templateId` in the create payload must be an integer**
+Passing `templateId` as a string causes a 400 "Report Template ID provided in request does not exist" error. The fix was to stop converting the template ID to `str()` before putting it in the payload.
+
+**3. Report status `items` is a list, not a dict**
+The GET `/reports/{id}` response wraps the item in a list: `{"items": [...]}`. The original code did `r.json()["items"].get("status")` which fails on a list. Fixed to `items[0] if isinstance(items, list) else items`.
+
+**4. Download endpoint returns 403 "not ready" even after status changes**
+After the job status changes to `manual_processing` (which means ready), the download URL still returns 403 for a variable amount of time. The `download_report` function now polls indefinitely every 5 seconds until the file is served — no timeout.
+
+**Status values observed:**
+- `waiting` → job queued
+- `manual_processing` → job complete, file being prepared (download may still 403)
+- File available → download returns 200
+
+---
+
+### 2026-04-28 — Committed vs uncommitted determined by call order
+
+**Rule:** In the absence of a CCW subscription export or invoice Recurring Charges block, committed
+users are determined by the order in which unique users first appear in the CCP-filtered CDR.
+
+Steps:
+1. Filter CDR: `PSTN vendor name` = `"Cisco Calling Plans"` AND `User type` = `"User"`
+2. Sort by call timestamp ascending
+3. The first N unique `User UUID` values (by earliest call) = **committed**, where N = the committed seat count provided by the engineer for this session
+4. All unique UUIDs beyond position N = **uncommitted**
+5. For each uncommitted user: count their actual individual active days from the CDR (not an average)
+6. QTY = sum of those individual day counts; apply `A-AUD-OCP1-U` rate
+
+**Ask the engineer for N** if it has not been provided. Do not assume a default.
+
+**Do not use an average.** Count each uncommitted user's actual active days individually —
+averaging across all users will be wrong whenever active-day counts vary.
+
+---
+
+### 2026-04-28 — Use cached docs instead of fetching; fix output path
+
+**What happened:** The workflow previously fetched reports to `/tmp/` every time, ignoring CSVs
+already saved in `docs/<UUID>/` from prior runs. The agent found and used existing cached files
+matching the requested billing period.
+
+**Fix applied:**
+1. Added **Step 2b** — check `docs/<UUID>/` for cached CSVs before fetching.
+2. Changed Step 3 output path from `/tmp/` to `docs/<UUID>/` with consistent filename patterns.
+3. Added org-ID → UUID decode command in Step 2 (base64 decode, take last `/`-delimited segment).
