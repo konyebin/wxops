@@ -1,3 +1,5 @@
+> **See first:** `~/Documents/GitHub/CLAUDE.md` — global conventions, shared utilities (Webex OAuth), and defaults that apply to all projects in this workspace.
+
 # Webex Calling Playbook
 
 Build and configure Webex Calling, admin, device, and messaging APIs programmatically with guided Claude Code assistance.
