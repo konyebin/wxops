@@ -6,6 +6,14 @@ This file defines the reasoning paths the billing-analyst agent must follow when
 
 All rate calculations must reference `billingcontext_data.md`. All report column references must reference `collab_reports.md`.
 
+**Working directory:** The billing-analyst agent must always operate out of `/Users/konyebin/wxops/report_bot/`. Read and write all scripts and output files relative to that directory.
+
+**Dashboard:** When the user asks for a dashboard, launch it immediately — do not just print instructions. Run:
+```
+cd /Users/konyebin/wxops && .venv/bin/streamlit run report_bot/billing_dashboard.py
+```
+Run this as a background process so it doesn't block, then tell the user to open http://localhost:8501.
+
 Sources used during construction of this document are listed in the Sources section below.
 
 ---
@@ -52,9 +60,10 @@ Sources used during construction of this document are listed in the Sources sect
      - `SIP_TOLLFREE` + `Direction` = `TERMINATING` → inbound toll-free minutes
 
 4. **Service number overage calculation**
-   - From CDR: filter rows where `Called number` matches a known service number
-   - Sum `Duration` per service number per month → minutes per SN
-   - For each SN: if minutes > 250 → overage = minutes − 250; apply `A-AUD-PSTN-SN` rate
+   - The bundle includes **250 minutes per service number per month** (inbound + outbound combined); this is a per-SN threshold, not a pooled org-wide bucket
+   - From CDR: filter rows where `Called number` OR `Calling number` matches a known service number
+   - Sum `Duration` per service number across both directions → total minutes per SN
+   - For each SN: if total minutes > 250 → overage = total − 250; apply `A-AUD-PSTN-SN` rate
    - Separate local vs non-local service numbers; apply `-NL` SKU for non-local
 
 5. **International minutes by destination**
@@ -65,16 +74,20 @@ Sources used during construction of this document are listed in the Sources sect
 
 6. **Build the estimated bill table**
 
+Only include SKUs with confirmed rates from the invoice sample. SKUs marked "NOT IN INVOICE" in `billingcontext_data.md` must be **omitted entirely** from the estimate — do not show them as $0.00 or unknown, just leave them out until rates are confirmed.
+
+Confirmed SKUs to include:
 ```
 | SKU | Description | QTY | Unit | Rate | Amount |
 |-----|-------------|-----|------|------|--------|
-| A-AUD-U-TN | Local TN Uncommitted | [days] | TN/day | ⚠️ EXPERIMENTAL | [calc] |
-| A-AUD-U-TN-NL | Non-Local TN Uncommitted | [days] | TN/day | ⚠️ EXPERIMENTAL | [calc] |
-| A-AUD-U-SN | Service Number Bundle | [days] | number/day | ⚠️ EXPERIMENTAL | [calc] |
-| A-AUD-PSTN-SN | Service Number Overage | [minutes] | per min | ⚠️ EXPERIMENTAL | [calc] |
-| A-AUD-PSTN-INT | International Calling | [minutes] | per min | ⚠️ EXPERIMENTAL | [calc] |
-| ... | ... | ... | ... | ⚠️ EXPERIMENTAL | [calc] |
+| A-AUD-U-TN | Local TN Uncommitted | [TN-days] | TN/day | $0.03 | [calc] |
+| A-AUD-U-IBTF | Inbound Toll-Free Number Bundle | [num-days] | number/day | $0.16 | [calc] |
+| A-AUD-OCP1-U | Outbound Calling Plan Uncommitted | [user-days] | user/day | $0.1315 | [calc] |
+| A-AUD-PSTN-IBTF | Inbound Toll-Free Minutes Overage | [minutes] | per min | $0.03 | [calc] |
+| A-AUD-PSTN-INT | International Metered Calling | [minutes] | per min | $0.0272 | [calc] |
 ```
+
+SKUs to omit until rates are confirmed: `A-AUD-U-TN-NL`, `A-AUD-U-SN`, `A-AUD-U-SN-NL`, `A-AUD-PSTN-SN`, `A-AUD-PSTN-SN-NL`, `A-AUD-PSTN-INT-NL`.
 
 > ⚠️ Flag every rate in the output table with **EXPERIMENTAL**. These are estimates only. The real rates are on the customer's invoice from Cisco.
 
@@ -82,6 +95,40 @@ Sources used during construction of this document are listed in the Sources sect
    - Subtotal (excl. tax)
    - Note that tax cannot be estimated without knowing the exact TN provisioning locations and applicable jurisdiction rates
    - Note the arrears lag: international and overage charges from this period will appear on the *next* invoice, not the current one
+
+8. **Always follow the line-item table with a detailed plain-English explanation of each charge.** Cover:
+
+   **Telephone Number Charges (local and non-local)**
+   - Explain that Cisco charges per TN per day regardless of whether it rings — it is a line rental fee
+   - Show the formula explicitly: `TN count × days in period × daily rate = amount`
+   - Explain the local vs non-local split: local = org's primary country (e.g., USA), non-local = all other countries, non-local rate is higher
+   - Flag the point-in-time caveat: TN inventory is a snapshot; mid-period adds/removes would lower the actual QTY
+
+   **Uncommitted Users (`A-AUD-OCP1-U`)**
+   - Explain what committed vs uncommitted means: the CCW order locks in N committed seats billed monthly in advance; any user beyond N who makes/receives a CCP call is billed as uncommitted at a daily rate
+   - Explain the call-order method: rank all unique CDR users (filtered to `PSTN vendor name = "Cisco Calling Plans"` and `User type = "User"`) by earliest call timestamp; first N = committed, the rest = uncommitted
+   - Show which specific users were uncommitted and how many active days each had
+   - Flag that N = 15 is a default assumption and must be confirmed from the CCW order
+
+   **International Minutes (`A-AUD-PSTN-INT`)**
+   - Explain that domestic calls (SIP_NATIONAL, SIP_MOBILE) are included in the plan — no per-minute charge
+   - International calls are metered; show destination, minutes, tier, and rate
+   - Note any unusual destinations (e.g., destination = "US" from a non-US location routing as international)
+
+   **Zero-dollar lines**
+   - For every $0.00 line, explain WHY it is zero (threshold not reached, no numbers of that type, etc.)
+   - Service number overage: state the 250 min/month threshold and show the actual minutes vs threshold for the busiest SN
+   - Toll-free: confirm no TF numbers in inventory and no SIP_TOLLFREE rows in CDR
+
+   **What is missing from the estimate**
+   - Always close with a table of what could not be calculated and where to find it:
+
+   | Missing piece | Why missing | Where to find it |
+   |---|---|---|
+   | Recurring committed plan charges | Set in CCW order, not in CDR/TN data | Customer's CCW subscription or prior invoice |
+   | Taxes | Requires per-TN jurisdiction data | Annexure section of a real invoice |
+   | Mid-period TN changes | TN inventory is a snapshot | Audit log or prior invoice's TN block |
+   | Actual contracted rates | Rates are from published rate sheets | Customer's rate card |
 
 ---
 
@@ -94,30 +141,32 @@ Two distinct overage mechanisms exist:
 ### Trigger A — Uncommitted Users (A-AUD-OCP1-U)
 
 1. Pull **Calling Detailed Call History** for the billing period
-2. Filter: `PSTN vendor name` = `"Cisco Calling Plans"`
-3. Extract unique `User UUID` values from filtered rows
-4. Cross-reference with the Recurring Charges section of the invoice:
-   - Users in CDR who have **no corresponding committed Outbound Calling Plan** in Recurring Charges → uncommitted users
-   - These users map to `A-AUD-OCP1-U` overage
-5. For each uncommitted user: count the number of days with call activity in the period
-6. Calculate: `user-days × daily rate (A-AUD-OCP1-U)`
+2. Filter: `PSTN vendor name` = `"Cisco Calling Plans"` AND `User type` = `"User"`
+3. Extract unique `User UUID` values, ordered by their **earliest call timestamp** in the period (ascending)
+4. **Determine committed vs uncommitted by call order:**
+   - The first N unique users to place or receive a CCP-billable call are deemed **committed** (where N = the committed seat count; default assumption is 15 unless told otherwise)
+   - All remaining unique users beyond position N are deemed **uncommitted**
+   - This approximates CCW committed plan allocation without requiring a CCW export
+5. For each uncommitted user: count the number of distinct calendar days with CCP call activity in the period
+6. Calculate: `uncommitted user-days × daily rate (A-AUD-OCP1-U)`
 7. Output:
 
 ```
-| User UUID | User Name | Days Active | Estimated Overage |
-|-----------|-----------|-------------|-------------------|
+| Rank | User UUID | User Name | First Call Date | Days Active | Status | Estimated Overage |
+|------|-----------|-----------|-----------------|-------------|--------|-------------------|
 ```
 
-> **Note:** Identifying "committed vs uncommitted" requires the invoice's Recurring Charges section or a CCW subscription export. If not available, flag all active CCP users for manual review.
+> **Assumption:** In the absence of a CCW subscription export or invoice Recurring Charges block, committed users are determined by call order — the first N callers in the period are treated as having committed seats. This is an approximation; actual committed users are defined by the CCW subscription, not call timing.
 
 ### Trigger B — Service Number Minutes > 250 (A-AUD-PSTN-SN / -NL)
 
+The 250 min/month threshold is **per service number** (not pooled across all SNs). Both inbound and outbound minutes count toward the threshold.
+
 1. Pull **Calling Detailed Call History** for the billing period
-2. Filter: `Called number` = known service numbers (from TN Inventory report)
-   - Alternatively filter: `Call type` in (`SIP_INBOUND`, `SIP_TOLLFREE`) where the Called number is a service number
-3. Group rows by `Called number` (service number)
-4. Sum `Duration` per service number → total minutes per SN for the period
-5. Apply the 250 min/month threshold:
+2. Filter: rows where `Called number` OR `Calling number` matches a known service number (from TN Inventory report)
+3. Group rows by service number (match against either column)
+4. Sum `Duration` per service number across both directions → total minutes per SN for the period
+5. Apply the 250 min/month threshold per SN:
    - If total minutes ≤ 250 → no overage
    - If total minutes > 250 → overage minutes = total − 250
 6. Classify each SN as local or non-local (from TN Inventory `Number type` and `Country`)
@@ -131,11 +180,14 @@ Two distinct overage mechanisms exist:
 
 ### Trigger C — Inbound Toll-Free Minutes (A-AUD-PSTN-IBTF)
 
+The toll-free bundle includes a set number of inbound minutes **per number** (not pooled). A one-time activation fee also applies in the first month the number is provisioned.
+
 1. Pull CDR, filter `Call type` = `SIP_TOLLFREE` + `Direction` = `TERMINATING`
 2. Group by `Called number` (toll-free number)
 3. Sum `Duration` per toll-free number
-4. Compare against included minutes for the toll-free bundle (check invoice for included amount)
+4. Compare against included minutes for the toll-free bundle (check invoice for included amount — threshold is per number, not org-wide)
 5. Calculate overage: total − included → apply `A-AUD-PSTN-IBTF` rate
+6. Flag any toll-free numbers newly provisioned in the period — these carry a one-time activation fee on first month's invoice
 
 ---
 

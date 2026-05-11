@@ -22,6 +22,14 @@ Sources used during construction of this document are listed in the Sources sect
 ---
 
 ## Invoice Structure
+description: this is the invoice with rates in csv format
+Invoice Line Num,SKU,Description,PO,Service To,Web Order ID,Subscription ID,Billing Period Start Date,Billing Period End Date,Original Invoice Num,Original Invoice Line Num,Duration Month(s),Quantity,UOM,Rate Price,Pricing Term,PA Program Discount,Extended Amount,Other Charges,Tax Rate,Tax Amount,List Price,Standard Discount%,Non-Standard Discount%,Promo Discount%,Other Discount%,Total Discount%,Net Price Before PA,Total PA Discount,Line Amount,Charge Type,Usage Details Exist
+1,A-AUD-OCP1-EA,Outbound Calling Plan - Committed Enterprise Agreement User,null,Customer name,1675645,Sub1855555,10-Apr-26,9-May-26,,,1,1000,Per User / mth,2.5,1,,2500,,,,2.5,,,,,,2.5,,2500,Recurring,N
+2,A-AUD-OCP1-U,Outbound Calling Plan- Uncommitted Usage Overage,null,Customer name,1675645,Sub1855555,10-Mar-26,9-Apr-26,,,,9073,Per user per day,0.1315,,,1193.13,,,,0.1315,,,,,,0.1315,,1193.13,Usage,Y
+3,A-AUD-PSTN-IBTF,Inbound Toll Free Minutes Overage,null,Customer name,1675645,Sub1855555,10-Mar-26,10-Apr-26,,,,24327,Per Minute,0.03,,,729.84,,,,0.029,,,,,,0.035,,729.84,Usage,Y
+4,A-AUD-PSTN-INT,International Metered Calling for Local,null,Customer name,1675645,Sub1855555,10-Mar-26,10-Apr-26,,,,39,Per Minute,0.0272,,,1.06,,,,,,,,,,0.0272,,1.06,Usage,Y
+5,A-AUD-U-IBTF,Inbound Toll Free Number Bundle Uncommitted Plan,null,Customer name,1675645,Sub1855555,10-Mar-26,9-Apr-26,,,,465,Per user per day,0.16,,,74.4,,,,0.164,,,,,,0.164,,74.4,Usage,Y
+6,A-AUD-U-TN,Telephone number (TN) for Local Number- Uncommitted,null,Customer name,1675645,Sub1855555,10-Mar-26,9-Apr-26,,,,16120,Per user per day,0.03,,,483.6,,,,0.0329,,,,,,0.0329,,483.6,Usage,Y
 
 ### Header Fields
 
@@ -100,25 +108,26 @@ Uncommitted elements are billed **monthly in arrears**, generally appearing on t
 
 > ⚠️ All rates marked **EXPERIMENTAL** are derived from invoice samples and publicly available rate sheets. They are NOT contractual. Actual rates depend on subscription type, country, and negotiated pricing. Always verify against the customer's actual invoice or partner rate card.
 
-| SKU | Description | Unit | Experimental Rate | Source |
-|-----|-------------|------|-------------------|--------|
-| `A-AUD-OCP1-U` | Outbound Calling Plan Uncommitted Usage Overage | Per user/day | ⚠️ ~$0.07–$0.10/user/day | Invoice sample |
-| `A-AUD-U-TN` | Telephone Number (TN) — Local Uncommitted | Per TN/day | ⚠️ ~$0.033/TN/day | Invoice sample |
-| `A-AUD-U-TN-NL` | Telephone Number (TN) — Non-Local Uncommitted | Per TN/day | ⚠️ ~$0.067/TN/day | Invoice sample |
-| `A-AUD-U-SN` | Service Number Bundle (TN + included minutes) | Per number/day | ⚠️ ~$0.083/number/day | Invoice sample |
-| `A-AUD-U-SN-NL` | Non-Local Service Number Bundle | Per number/day | ⚠️ ~$0.133/number/day | Invoice sample |
-| `A-AUD-U-IBTF` | Inbound Toll-Free Number Bundle Uncommitted | Per number/day | ⚠️ ~$0.10/number/day | Invoice sample |
-| `A-AUD-PSTN-SN` | Service Number Minutes Overage (Local) | Per minute | ⚠️ ~$0.02/min | Invoice sample |
-| `A-AUD-PSTN-SN-NL` | Non-Local Service Number Minutes Overage | Per minute | ⚠️ ~$0.025/min | Invoice sample |
-| `A-AUD-PSTN-IBTF` | Inbound Toll-Free Minutes Overage | Per minute | ⚠️ ~$0.025/min | Invoice sample |
-| `A-AUD-PSTN-INT` | International Metered Calling — Local origin | Per minute | ⚠️ See destination table | Rate sheet |
-| `A-AUD-PSTN-INT-NL` | International Metered Calling — Non-Local origin | Per minute | ⚠️ See destination table | Rate sheet |
+| SKU | Description | Unit | Rate | Source |
+|-----|-------------|------|------|--------|
+| `A-AUD-OCP1-U` | Outbound Calling Plan Uncommitted Usage Overage | Per user/day | $0.1315/user/day | Invoice sample (line 2) |
+| `A-AUD-U-TN` | Telephone Number (TN) — Local Uncommitted | Per TN/day | $0.03/TN/day | Invoice sample (line 6) |
+| `A-AUD-U-TN-NL` | Telephone Number (TN) — Non-Local Uncommitted | Per TN/day | ⚠️ NOT IN INVOICE — rate unknown | Not in invoice sample |
+| `A-AUD-U-SN` | Service Number Bundle (TN + included minutes) — Local | Per number/day | ⚠️ NOT IN INVOICE — rate unknown | Not in invoice sample |
+| `A-AUD-U-SN-NL` | Service Number Bundle — Non-Local | Per number/day | ⚠️ NOT IN INVOICE — rate unknown | Not in invoice sample |
+| `A-AUD-U-IBTF` | Inbound Toll-Free Number Bundle Uncommitted | Per number/day | $0.16/number/day | Invoice sample (line 5) |
+| `A-AUD-PSTN-SN` | Service Number Minutes Overage (Local) | Per minute | ⚠️ NOT IN INVOICE — rate unknown | Not in invoice sample |
+| `A-AUD-PSTN-SN-NL` | Non-Local Service Number Minutes Overage | Per minute | ⚠️ NOT IN INVOICE — rate unknown | Not in invoice sample |
+| `A-AUD-PSTN-IBTF` | Inbound Toll-Free Minutes Overage | Per minute | $0.03/min | Invoice sample (line 3) |
+| `A-AUD-PSTN-INT` | International Metered Calling — Local origin | Per minute | $0.0272/min (avg) | Invoice sample (line 4) |
+| `A-AUD-PSTN-INT-NL` | International Metered Calling — Non-Local origin | Per minute | ⚠️ NOT IN INVOICE — rate unknown | Not in invoice sample |
 
 **Notes:**
 - `A-AUD-*` prefix indicates Australia as the billing country; other countries use a different regional prefix
 - `-NL` suffix denotes Non-Local numbers (numbers provisioned outside the customer's primary location state/region)
 - `U-` in SKU indicates an uncommitted (usage-based) element
 - `PSTN-` in SKU indicates a per-minute usage charge
+- SKUs marked **NOT IN INVOICE** were not present in the provided invoice sample. Do not apply these rates in estimates — flag them as unknown and ask the customer to provide their rate card or a more complete invoice.
 
 ---
 
